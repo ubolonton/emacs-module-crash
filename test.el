@@ -9,10 +9,13 @@ Value: %s
 " (type-of x) x)
        (print x))))
 
-;; ;;; Crashes
+;;; Crashes.
 ;; (test "crash")
 
-(test "ok-1")
-(test "ok-2")
-(test "ok-3")
-(test "ok-4")
+;;; Works
+(test "stack-allocated")
+(test "gc-after-construction")
+
+;;; Crashes on Linux. Works on macOS.
+;; (test "gc-after-passing-back")
+;; (test "gc-after-printing")

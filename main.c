@@ -40,6 +40,12 @@ static emacs_value print(emacs_env *env, emacs_value v)
   return call(env, "print", 1, args);
 }
 
+static emacs_value identity(emacs_env *env, emacs_value v)
+{
+  emacs_value args[] = { v };
+  return call(env, "identity", 1, args);
+}
+
 static emacs_value crash(emacs_env *env, ptrdiff_t nargs, emacs_value args[], void *data)
 {
   emacs_value *v = malloc(2 * sizeof * v);
@@ -57,7 +63,7 @@ static emacs_value crash(emacs_env *env, ptrdiff_t nargs, emacs_value args[], vo
 }
 
 // Use stack-allocated array.
-static emacs_value ok_1(emacs_env *env, ptrdiff_t nargs, emacs_value args[], void *data)
+static emacs_value stack_allocated(emacs_env *env, ptrdiff_t nargs, emacs_value args[], void *data)
 {
   emacs_value v[2];
   v[0] = env->make_string(env, "1", 1);
@@ -72,7 +78,7 @@ static emacs_value ok_1(emacs_env *env, ptrdiff_t nargs, emacs_value args[], voi
 }
 
 // Construct the returned list before calling GC.
-static emacs_value ok_2(emacs_env *env, ptrdiff_t nargs, emacs_value args[], void *data)
+static emacs_value gc_after_construction(emacs_env *env, ptrdiff_t nargs, emacs_value args[], void *data)
 {
   emacs_value *v = malloc(2 * sizeof * v);
   v[0] = env->make_string(env, "1", 1);
@@ -88,14 +94,14 @@ static emacs_value ok_2(emacs_env *env, ptrdiff_t nargs, emacs_value args[], voi
 }
 
 // Pass the received emacs_value's into Lisp again before calling GC.
-static emacs_value ok_3(emacs_env *env, ptrdiff_t nargs, emacs_value args[], void *data)
+static emacs_value gc_after_passing_back(emacs_env *env, ptrdiff_t nargs, emacs_value args[], void *data)
 {
   emacs_value *v = malloc(2 * sizeof * v);
   v[0] = env->make_string(env, "1", 1);
   v[1] = env->make_string(env, "2", 1);
 
-  print(env, v[0]);
-  print(env, v[1]);
+  identity(env, v[0]);
+  identity(env, v[1]);
 
   gc(env);
 
@@ -107,13 +113,13 @@ static emacs_value ok_3(emacs_env *env, ptrdiff_t nargs, emacs_value args[], voi
 }
 
 // Pass one received emacs_value's into Lisp, printf the other, before calling GC.
-static emacs_value ok_4(emacs_env *env, ptrdiff_t nargs, emacs_value args[], void *data)
+static emacs_value gc_after_printing(emacs_env *env, ptrdiff_t nargs, emacs_value args[], void *data)
 {
   emacs_value *v = malloc(2 * sizeof * v);
   v[0] = env->make_string(env, "1", 1);
   v[1] = env->make_string(env, "2", 1);
 
-  // If the next 2 lines are switched, the later 'print(env, list)' call crashes.
+  // If the next 2 lines are switched, the later 'print(env, list)' call crashes even on macOS.
   print(env, v[0]);
   printf("-> %x\n", v[1]);
 
@@ -131,10 +137,10 @@ int emacs_module_init(struct emacs_runtime *ert)
   emacs_env *env = ert->get_environment(ert);
 
   bind_function(env, "testing/crash", env->make_function(env, 0, 0, crash, "", NULL));
-  bind_function(env, "testing/ok-1", env->make_function(env, 0, 0, ok_1, "", NULL));
-  bind_function(env, "testing/ok-2", env->make_function(env, 0, 0, ok_2, "", NULL));
-  bind_function(env, "testing/ok-3", env->make_function(env, 0, 0, ok_3, "", NULL));
-  bind_function(env, "testing/ok-4", env->make_function(env, 0, 0, ok_4, "", NULL));
+  bind_function(env, "testing/stack-allocated", env->make_function(env, 0, 0, stack_allocated, "", NULL));
+  bind_function(env, "testing/gc-after-construction", env->make_function(env, 0, 0, gc_after_construction, "", NULL));
+  bind_function(env, "testing/gc-after-passing-back", env->make_function(env, 0, 0, gc_after_passing_back, "", NULL));
+  bind_function(env, "testing/gc-after-printing", env->make_function(env, 0, 0, gc_after_printing, "", NULL));
   provide(env, "testing");
   return 0;
 }
